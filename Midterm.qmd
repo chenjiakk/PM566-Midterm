@@ -1,0 +1,212 @@
+---
+title: "Midterm"
+author: "Chenjia Kuang"
+format: html
+editor: visual
+embed-resources: true
+---
+
+## Introduction
+
+This dataset contains information on 13,932 single-family homes sold in Miami.
+
+#### Question
+
+Main question: What factor will influence the sale price?
+
+## Methods
+
+```{r}
+library('R.utils')
+library('tidyverse')
+library('ggplot2')
+library('data.table')
+library('dtplyr')
+library('dplyr')
+library('scales')
+```
+
+#### Read the dataset
+
+I download data in csv form from The KAGGLE <https://www.kaggle.com/datasets/deepcontractor/miami-housing-dataset>
+
+```{r}
+setwd("/Users/chenjiak/Downloads")
+miami <- data.table::fread("miami-housing.csv")
+```
+
+#### Look at the data (EDA)
+
+```{r}
+dim(miami)
+names(miami)
+typeof(miami)
+```
+
+```{r}
+#Rename the columns
+miami <- miami %>%
+  rename("lon" = "LONGITUDE",
+         "lat" = "LATITUDE",
+         "floor_area" = "TOT_LVG_AREA",
+         "land_area"  = "LND_SQFOOT")
+```
+
+```{r}
+#Select the columns
+miami <- miami[, .(lat, lon, SALE_PRC, land_area, floor_area, OCEAN_DIST, RAIL_DIST, CNTR_DIST, age, avno60plus, structure_quality, month_sold)]
+```
+
+```{r}
+#Take a closer look at the key variables.
+table(miami$month_sold)
+table(miami$structure_quality)
+```
+
+```{r}
+summary(miami$SALE_PRC)
+summary(miami$land_area)
+summary(miami$floor_area)
+summary(miami$RAIL_DIST)
+summary(miami$OCEAN_DIST)
+summary(miami$CNTR_DIST)
+```
+
+We checked the dimension of our data and noticed that there are 13932 total observations and 17 different factors for each of our observation. I selected some variables that may effect the house price for further analysis. Then, I did some summaries for the key variables such as the distance to ocean, rail road, central business district, and the area of house land area and floor area. I found the lowest house price is \$72000 and the highest price is \$2650000. The smallest land area is 1248 square feet and the largest is 57064 square feet. For the floor area, the smallest is 854 square feet and the largest is 6287 square feet.
+
+#### Variable creation
+
+```{r}
+#Creatint a column about the quality for houses structure
+
+miami <- miami %>%
+  group_by(structure_quality) %>%
+  mutate(structure.quality = case_when(
+    structure_quality == 1 ~ "Fair",
+    structure_quality == 2 ~ "Average",
+    structure_quality == 3 ~ "Good",
+    structure_quality == 4 ~ "Excellent Quality",
+    structure_quality == 5 ~ "Superior Quality")) %>% collect()
+
+table(miami$structure.quality)
+```
+
+```{r}
+#Creatint a column about the quality for airport noise level
+
+miami <- miami %>%
+  group_by(avno60plus) %>%
+  mutate(avno60_plus = case_when(
+    avno60plus == 0 ~ "Accpet",
+    avno60plus == 1 ~ "Exceed")) %>% collect()
+
+table(miami$avno60_plus)
+```
+
+```{r}
+knitr::kable(head(miami))
+```
+
+I created two variable about the house structure quality and airport noise level for further data analysis.
+
+## Preliminary Results
+
+```{r}
+#Creating price per square foot features
+miami$price_per_land_area <- miami$SALE_PRC / miami$land_area
+miami$price_per_floor_area <- miami$SALE_PRC / miami$floor_area
+
+summary(miami$price_per_land_area)
+summary(miami$price_per_floor_area)
+```
+
+```{r}
+#Creating relation graph for housing saling price and ocean distance which pretty make sense since miami is a  travel city
+
+ggplot(miami, aes(x = OCEAN_DIST, y = SALE_PRC)) + 
+  geom_point(aes(color = SALE_PRC), alpha = 0.6) + 
+  theme_minimal() +
+  labs(title = "Correlation between ocsan distance and the sale price",
+       x = "Ocean distance", y = "Sale price") +
+  scale_color_gradient(low = "blue", high = "red") + 
+  stat_smooth(method = lm) +
+  theme(legend.position = "none")
+```
+
+```{r}
+#Creating relation graph for housing saling price for land area per square feet and ocean distance
+
+ggplot(miami, aes(x = OCEAN_DIST, y = price_per_land_area)) + 
+  geom_point(aes(color = price_per_land_area), alpha = 0.6) + 
+  theme_minimal() +
+  labs(title = "Correlation between ocsan distance and the price per land area",
+       x = "Ocean distance", y = "Price per land area") +
+  scale_color_gradient(low = "blue", high = "red") + 
+  stat_smooth(method = lm) +
+  theme(legend.position = "none")
+```
+
+```{r}
+#Creating relation graph for housing saling price for floor area per square feet and ocean distance
+
+ggplot(miami, aes(x = OCEAN_DIST, y = price_per_floor_area)) + 
+  geom_point(aes(color = price_per_floor_area), alpha = 0.6) + 
+  theme_minimal() +
+  labs(title = "Correlation between ocsan distance and the price per floor area",
+       x = "Ocean distance", y = "Price per floor area") +
+  scale_color_gradient(low = "blue", high = "red") + 
+  stat_smooth(method = lm) +
+  theme(legend.position = "none")
+```
+
+```{r}
+#Creating relation graph for housing saling price and distance to the nearest rail line
+
+ggplot(miami, aes(x = RAIL_DIST, y = SALE_PRC)) +
+  geom_point(aes(color = SALE_PRC), alpha = 0.6) +
+  theme_minimal() +
+  scale_color_gradient(low = "blue", high = "red") +
+  stat_smooth(method = lm) +
+  labs(title = "Correlation between the distance to the nearest rail line and the sale price",
+       x = "Rail distance", y = "Sale price") +
+  theme(legend.position = "none")
+```
+
+```{r}
+#Creating relation graph for housing saling price and the distance to the Miami central business district
+
+ggplot(miami, aes(x = CNTR_DIST, y = SALE_PRC)) +
+  geom_point(aes(color = SALE_PRC), alpha = 0.6) +
+  theme_minimal() +
+  scale_color_gradient(low = "blue", high = "red") +
+  stat_smooth(method = lm) +
+  labs(title = "Correlation between the distance to the nearest Miami central business district and the sale price",
+       x = "Central business district distance", y = "Sale price") +
+  theme(legend.position = "none")
+```
+
+```{r}
+#Creating a histogram graph to find out the correlation between house price and the structure quality
+
+miami %>%
+  filter(!(structure.quality %in% NA)) %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = SALE_PRC, fill = structure.quality)) +
+  labs(title = "Sale price by struvture quality", x = "Sale price", y = "Count") +
+  scale_fill_brewer(palette = "Spectral")
+```
+
+```{r}
+#Creating a histogram graph to find out the correlation between house price and the airplane noise level
+
+miami %>%
+  filter(!(avno60_plus %in% NA)) %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = SALE_PRC, fill = avno60_plus)) +
+  labs(title = "Sale price by airplane noise level", x = "Sale price", y = "Count") +
+  scale_fill_brewer(palette = "YlGnBu")
+```
+
+## Conclusion
+
+According to the Kaggle's Miami House Dataset, home values are influenced by the distance to the ocean, railroads, central business district, and airport noise. Coastal properties, offering better views and convenience, usually have higher values. The least impactful factor is railroads, while CBD proximity greatly affects values, given its role as a city's economic hub. Moreover, floor area impacts price more than land area. This may be because the usable area of a building is more important than the land area. This phenomenon is common in high-density or land-scarce areas. Interestingly, the structure quality doesn't significantly affect prices, suggesting buyers prioritize location and size over construction quality.
